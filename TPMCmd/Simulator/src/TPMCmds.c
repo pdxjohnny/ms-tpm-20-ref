@@ -270,7 +270,7 @@ main(
                 if (s_Argv[i] != nptr)
                 {
                     // A numeric option is found
-                    if(!*nptr && portNum > 0 && portNum < 65535)
+                    if(!*nptr && portNum >= 0 && portNum < 65535)
                     {
                         PortNum = portNum;
                         s_ArgsMask ^= 1 << i;

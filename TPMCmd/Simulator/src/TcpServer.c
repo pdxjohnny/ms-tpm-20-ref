@@ -109,11 +109,12 @@ struct
 // This function creates a socket listening on 'PortNumber'.
 static int
 CreateSocket(
-    int                  PortNumber,
+    int                  *PortNumber,
     SOCKET              *listenSocket
     )
 {
     struct               sockaddr_in MyAddress;
+    socklen_t MyAddressSize = sizeof(MyAddress);
     int res;
 //  
     // Initialize Winsock
@@ -135,11 +136,11 @@ CreateSocket(
         return -1;
     }
     // bind the listening socket to the specified port
-    ZeroMemory(&MyAddress, sizeof(MyAddress));
-    MyAddress.sin_port = htons((short)PortNumber);
+    ZeroMemory(&MyAddress, MyAddressSize);
+    MyAddress.sin_port = htons((short)*PortNumber);
     MyAddress.sin_family = AF_INET;
 
-    res = bind(*listenSocket, (struct sockaddr*) &MyAddress, sizeof(MyAddress));
+    res = bind(*listenSocket, (struct sockaddr*) &MyAddress, MyAddressSize);
     if(res == SOCKET_ERROR)
     {
         printf("Bind error.  Error is 0x%x\n", WSAGetLastError());
@@ -152,6 +153,12 @@ CreateSocket(
         printf("Listen error.  Error is 0x%x\n", WSAGetLastError());
         return -1;
     }
+    // In case port was 0 (bind to any open port) get port bound to
+    if (0 != getsockname(*listenSocket, (struct sockaddr*) &MyAddress, &MyAddressSize)) {
+        printf("Error getting port.  Error is 0x%x\n", WSAGetLastError());
+        return -1;
+    }
+    *PortNumber = ntohs(MyAddress.sin_port);
     return 0;
 }
 
@@ -261,7 +268,7 @@ PlatformSvcRoutine(
     socklen_t            length;
     BOOL                 continueServing;
 //
-    res = CreateSocket(PortNumber, &listenSocket);
+    res = CreateSocket(&PortNumber, &listenSocket);
     if(res != 0)
     {
         printf("Create platform service socket fail\n");
@@ -348,7 +355,7 @@ RegularCommandService(
     socklen_t            length;
     BOOL                 continueServing;
 //
-    res = CreateSocket(PortNumber, &listenSocket);
+    res = CreateSocket(&PortNumber, &listenSocket);
     if(res != 0)
     {
         printf("Create platform service socket fail\n");
@@ -498,7 +505,7 @@ StartTcpServer(
 #endif
 
     // Start Platform Signal Processing Service
-    res = PlatformSignalService(PortNumber + 1);
+    res = PlatformSignalService(PortNumber > 0 ? PortNumber + 1 : 0);
     if(res != 0)
     {
         printf("PlatformSignalService failed\n");
